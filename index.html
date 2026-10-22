@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>サイコロ日本一周</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <main id="map-wrap">
+    <svg id="map" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"></svg>
+    <div id="map-ctrl">
+      <button data-z="in" title="拡大">＋</button>
+      <button data-z="out" title="縮小">－</button>
+      <button data-z="all" title="全国を表示">全国</button>
+      <button data-z="me" title="手番プレイヤーと目的地">現在地</button>
+    </div>
+    <div id="toast"></div>
+    <div id="dice-overlay"></div>
+  </main>
+  <aside id="side">
+    <header id="status">
+      <div id="date"></div>
+      <div id="dest"></div>
+    </header>
+    <section id="players"></section>
+    <section id="actions"></section>
+    <section id="log"></section>
+  </aside>
+</div>
+<div id="modal" class="hidden"><div class="modal-box"></div></div>
+<script src="js/data.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
