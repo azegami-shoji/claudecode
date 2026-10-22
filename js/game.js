@@ -690,15 +690,21 @@
     const ranking = G.players.map((p, i) => ({ p, i, a: assets(i) })).sort((a, b) => b.a - a.a);
     const winner = ranking[0];
     setActions(`<div class="prompt">ゲーム終了！</div><button class="btn primary" id="again">もう一度遊ぶ</button>`);
-    $('#again').onclick = () => location.reload();
+    $('#again').onclick = () => restart();
     const box = openModal(`<h2>🏆 最終結果</h2>
       <p class="big-msg"><b style="color:${winner.p.color}">${esc(winner.p.name)}</b>が日本一の資産家に！</p>
       <ol class="ranking final">${ranking.map(r => `<li><span class="owner" style="--c:${r.p.color}">${esc(r.p.name)}</span>
         <span class="muted small">物件${ownedProps(r.i).length}件</span><b>${fmt(r.a)}</b></li>`).join('')}</ol>
       <div class="modal-actions"><button class="btn" id="m-close">盤面を見る</button><button class="btn primary" id="m-again">もう一度遊ぶ</button></div>`);
     $('#m-close', box).onclick = closeModal;
-    $('#m-again', box).onclick = () => location.reload();
+    $('#m-again', box).onclick = () => restart();
     log(`🏆 <b>${esc(winner.p.name)}</b>の優勝！`, winner.p.color);
+  }
+
+  function restart() {
+    closeModal();
+    $('#log').innerHTML = '';
+    setupScreen();
   }
 
   async function gameLoop() {
