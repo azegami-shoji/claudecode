@@ -15,7 +15,8 @@
     { key: 'shinkansen', name: '新幹線カード', dice: 4, w: 15 },
   ];
   const SQUARE_LABEL = { plus: '青マス', minus: '赤マス', card: '黄マス' };
-  const WORLD = { minX: -20, minY: -10, maxX: 960, maxY: 1070 };
+  const WORLD = { minX: 0, minY: 0, maxX: 1380, maxY: 1460 };
+  const MAX_W = 1800;
 
   function fmt(v) {
     const neg = v < 0;
@@ -58,14 +59,15 @@
     const rnd = mulberry32(20261022);
     STATIONS.forEach(s => {
       stationByName[s.name] = addNode({
-        type: 'station', name: s.name, x: s.x, y: s.y, lp: s.lp,
+        type: 'station', name: s.name, lp: s.lp,
+        x: (s.lon - PROJ.lon0) * PROJ.kx, y: (PROJ.lat0 - s.lat) * PROJ.ky,
         props: s.props.map(([name, price, rate]) => ({ name, price, rate, owner: -1 })),
       });
     });
     ROUTES.forEach(([a, b, kind]) => {
       const A = nodes[stationByName[a]], B = nodes[stationByName[b]];
       const d = Math.hypot(A.x - B.x, A.y - B.y);
-      const n = Math.max(1, Math.min(4, Math.round(d / 34)));
+      const n = Math.max(1, Math.min(4, Math.round(d / 40)));
       let prev = A.id;
       for (let i = 1; i <= n; i++) {
         const t = i / (n + 1);
@@ -166,26 +168,21 @@
 
   function drawBoard() {
     svg.innerHTML = '';
-    ['sea', 'coast', 'land', 'routes', 'squares', 'stations', 'marks', 'path', 'cands', 'tokens'].forEach(n => {
+    ['sea', 'land', 'routes', 'squares', 'stations', 'marks', 'path', 'cands', 'tokens'].forEach(n => {
       layers[n] = el('g', { class: 'layer-' + n }, svg);
     });
     el('rect', { x: -3000, y: -3000, width: 7000, height: 7000, class: 'sea' }, layers.sea);
+    el('path', { d: COAST_OTHER, class: 'foreign' }, layers.land);
+    el('path', { d: COAST_JAPAN, class: 'land' }, layers.land);
     links.forEach(l => {
       const A = nodes[l.a], B = nodes[l.b];
-      const xy = { x1: A.x, y1: A.y, x2: B.x, y2: B.y };
-      if (!l.sea) {
-        el('line', { ...xy, class: 'coast' }, layers.coast);
-        el('line', { ...xy, class: 'land' }, layers.land);
-      }
-      el('line', { ...xy, class: l.sea ? 'route sea-route' : 'route' }, layers.routes);
+      el('line', { x1: A.x, y1: A.y, x2: B.x, y2: B.y, class: l.sea ? 'route sea-route' : 'route' }, layers.routes);
     });
     nodes.forEach(n => {
       if (n.type === 'station') {
-        el('circle', { cx: n.x, cy: n.y, r: 30, class: 'coast' }, layers.coast);
-        el('circle', { cx: n.x, cy: n.y, r: 26, class: 'land' }, layers.land);
         const g = el('g', { class: 'station', 'data-id': n.id }, layers.stations);
         n.el = el('rect', { x: n.x - 9, y: n.y - 9, width: 18, height: 18, rx: 4, class: 'st-box' }, g);
-        const off = { t: [0, -16, 'middle'], b: [0, 25, 'middle'], l: [-14, 5, 'end'], r: [14, 5, 'start'] }[n.lp || 't'];
+        const off = { t: [0, -16, 'middle'], b: [0, 25, 'middle'], l: [-14, 5, 'end'], r: [14, 5, 'start'], br: [8, 28, 'start'] }[n.lp || 't'];
         const t = el('text', { x: n.x + off[0], y: n.y + off[1], 'text-anchor': off[2], class: 'st-label' }, g);
         t.textContent = n.name;
         n.pips = n.props.map((p, i) => el('circle', {
@@ -251,7 +248,7 @@
   }
 
   // ---------- カメラ ----------
-  const cam = { x: 470, y: 530, w: 1000, tx: 470, ty: 530, tw: 1000 };
+  const cam = { x: 690, y: 730, w: 1400, tx: 690, ty: 730, tw: 1400 };
   let dragMoved = false;
   function aspect() {
     const r = svg.getBoundingClientRect();
@@ -273,9 +270,9 @@
     const asp = aspect();
     cam.tx = (minX + maxX) / 2;
     cam.ty = (minY + maxY) / 2;
-    cam.tw = Math.min(1400, Math.max(minW, maxX - minX + pad * 2, (maxY - minY + pad * 2) / asp));
+    cam.tw = Math.min(MAX_W, Math.max(minW, maxX - minX + pad * 2, (maxY - minY + pad * 2) / asp));
   }
-  function focusNodes(ids, minW = 520) {
+  function focusNodes(ids, minW = 680) {
     const xs = ids.map(i => nodes[i].x), ys = ids.map(i => nodes[i].y);
     fitBox(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), 50, minW);
   }
@@ -310,7 +307,7 @@
     }));
     window.addEventListener('resize', applyCam);
   }
-  function zoom(f) { cam.tw = Math.min(1400, Math.max(150, cam.tw * f)); }
+  function zoom(f) { cam.tw = Math.min(MAX_W, Math.max(150, cam.tw * f)); }
 
   // ---------- UI ----------
   function renderHeader() {
@@ -645,7 +642,7 @@
   async function playTurn() {
     const pi = G.turn, p = cur();
     renderAll();
-    focusNodes([p.pos, G.dest].filter(x => x != null), 560);
+    focusNodes([p.pos, G.dest].filter(x => x != null), 720);
     if (p.cpu) setActions(`<div class="prompt" style="--c:${p.color}">${esc(p.name)}（CPU）が考え中…</div>`);
     const choice = await askRoll(p);
     if (choice.card >= 0) {
@@ -660,7 +657,7 @@
     else setActions(`<div class="prompt" style="--c:${p.color}">サイコロを振っています…</div>`);
     const steps = await rollDice(choice.dice);
     const cands = reachable(p.pos, steps, G.dest);
-    focusNodes([p.pos, ...cands.keys()], 480);
+    focusNodes([p.pos, ...cands.keys()], 600);
     const target = await askMove(p, cands, steps);
     setActions(`<div class="prompt" style="--c:${p.color}">${esc(p.name)}が移動中…</div>`);
     await animateMove(pi, cands.get(target));
@@ -747,7 +744,7 @@
           <li><b>駅</b>に止まると、その駅の物件を買えます。毎年3月の決算で、物件の収益（価格×収益率）が入ります。</li>
           <li>1つの駅の物件を全部買うと<b>独占</b>！ その駅の収益が2倍になります。</li>
           <li><span class="sq-ic plus"></span>青マスはお金がもらえ、<span class="sq-ic minus"></span>赤マスはお金を失います（冬は被害大）。<span class="sq-ic card"></span>黄マスではサイコロを増やせるカードがもらえます。</li>
-          <li>🚩<b>目的地</b>に一番乗りすると賞金がもらえます。</li>
+          <li>🚩<b>目的地</b>は全国100駅からランダムに決まります。一番乗りすると賞金がもらえます。</li>
           <li>所持金がマイナスになると、安い物件から半額で売却されます。</li>
           <li>最終年の決算後、<b>総資産（所持金＋物件価格）</b>が一番多い人の勝ち！</li>
         </ul>

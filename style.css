@@ -9,7 +9,8 @@
   --accent: #d84315;
   --sea: #a9d4ec;
   --land: #f3ecd2;
-  --coast: #d9caa0;
+  --coast: #b9a774;
+  --foreign: #e2e0d6;
   --plus: #1e6fd9;
   --minus: #e0392b;
   --card: #f2b705;
@@ -35,9 +36,8 @@ button { font: inherit; }
 
 /* ---- map ---- */
 .sea { fill: var(--sea); }
-.coast { stroke: var(--coast); stroke-width: 60; stroke-linecap: round; fill: var(--coast); }
-.land { stroke: var(--land); stroke-width: 52; stroke-linecap: round; fill: var(--land); }
-circle.coast, circle.land { stroke: none; }
+.land { fill: var(--land); stroke: var(--coast); stroke-width: 1.5; stroke-linejoin: round; }
+.foreign { fill: var(--foreign); stroke: var(--coast); stroke-width: 1; }
 .route { stroke: #5b5b66; stroke-width: 3; }
 .sea-route { stroke: #3f7fae; stroke-dasharray: 6 5; stroke-width: 2.5; }
 .sq { stroke: #fff; stroke-width: 1.5; }
