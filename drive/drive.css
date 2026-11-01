@@ -1,0 +1,38 @@
+/* サイコロ日本一周ドライブ: ../style.css への追加分 (道路・SA/道の駅の見た目) */
+:root { --hwy: #1b7f4a; --michi: #1565c0; --bridge: #2f6fa8; }
+
+.route { stroke: #4a5a50; stroke-width: 4; }
+.bridge-route { stroke: var(--bridge); stroke-width: 4.5; }
+.sea-route { stroke: #3f7fae; }
+
+.station.k-sa .st-box, .station.k-pa .st-box { stroke: var(--hwy); }
+.station.k-mi .st-box { stroke: var(--michi); }
+.station:hover .st-box { stroke: var(--accent); }
+.st-box.mono { stroke: #222; }
+
+.road-label {
+  display: none; font-size: 10px; font-weight: 700; fill: #2d5a40; pointer-events: none;
+  paint-order: stroke; stroke: rgba(255,255,255,.92); stroke-width: 3px; stroke-linejoin: round;
+}
+#map.zoomed .road-label { display: block; }
+
+.token-text { font-size: 13px; }
+
+#legend {
+  position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 4px 12px; max-width: calc(100% - 200px);
+  background: rgba(255,255,255,.92); border: 1px solid rgba(0,0,0,.12); border-radius: 10px; padding: 6px 10px;
+  font-size: 12px; font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,.15); pointer-events: none;
+}
+#legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.lg { display: inline-block; width: 14px; height: 14px; background: #fff; box-sizing: border-box; }
+.lg-sa { border: 2.5px solid var(--hwy); border-radius: 3px; }
+.lg-mi { border: 2.5px solid var(--michi); border-radius: 50%; }
+.lg-road, .lg-bridge, .lg-ferry { height: 0; width: 20px; background: none; border-top: 4px solid #4a5a50; }
+.lg-bridge { border-top-color: var(--bridge); }
+.lg-ferry { border-top: 3px dashed #3f7fae; }
+.sq-ic.sa { border: 2px solid var(--hwy); border-radius: 2px; background: #fff; }
+.sq-ic.mi { border: 2px solid var(--michi); background: #fff; }
+
+@media (max-width: 800px) {
+  #legend { max-width: calc(100% - 24px); bottom: 62px; font-size: 11px; }
+}
