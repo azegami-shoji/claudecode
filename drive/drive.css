@@ -47,3 +47,18 @@
 .fuel-box .fbar { height: 10px; min-width: 60px; }
 .fuel-box b { font-variant-numeric: tabular-nums; }
 #toast.toll { background: rgba(60,70,64,.95); }
+
+/* 紫マス (カーディーラー) */
+.sq-car { fill: #7b3fc4; }
+.sq-ic.car { background: #7b3fc4; }
+.cand-btn.t-car { border-left-color: #7b3fc4; }
+#toast.car { background: rgba(110,50,180,.95); }
+.pl-row.car { color: #6a35ad; font-weight: 700; font-size: 11px; }
+.inset-frame { fill: var(--sea); stroke: #8fb4cc; stroke-width: 2; stroke-dasharray: 6 4; }
+.inset-label { font-size: 11px; font-weight: 700; fill: #4d7691; }
+.car-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.car-btn { display: flex; align-items: center; gap: 10px; text-align: left; padding: 10px 12px; }
+.car-emoji { font-size: 28px; }
+.car-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.car-info small { font-weight: 500; color: var(--muted); }
+.car-price { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
