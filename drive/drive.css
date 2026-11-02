@@ -36,3 +36,14 @@
 @media (max-width: 800px) {
   #legend { max-width: calc(100% - 24px); bottom: 62px; font-size: 11px; }
 }
+
+/* ガソリン残量 */
+.pl-row.fuel { align-items: center; gap: 6px; }
+.fbar { flex: 1; height: 8px; border-radius: 4px; background: #e6e3da; overflow: hidden; }
+.fbar i { display: block; height: 100%; background: #2e9e5b; transition: width .3s; }
+.pl-row.fuel.low .fbar i, .fuel-box.low .fbar i { background: var(--minus); }
+.pl-row.fuel.low b { color: var(--minus); }
+.fuel-box { display: flex; align-items: center; gap: 8px; margin: 8px 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #faf7f0; }
+.fuel-box .fbar { height: 10px; min-width: 60px; }
+.fuel-box b { font-variant-numeric: tabular-nums; }
+#toast.toll { background: rgba(60,70,64,.95); }

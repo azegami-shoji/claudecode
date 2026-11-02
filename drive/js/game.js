@@ -9,6 +9,10 @@
   const MONTHS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
   const START_CASH = 10000;
   const MAX_CARDS = 5;
+  const FUEL_MAX = 30;            // タンク容量 (マス数)
+  const FUEL_PRICE = 15;          // ガソリン1目盛の値段 (万円)
+  const TOLL = { road: 8, bridge: 20, sea: 40 }; // 1マスあたりの通行料 (万円)
+  const JAF_FEE = 1500;           // ガス欠の救援費用 (万円)
   const CARD_TYPES = [
     { key: 'etc', name: 'ETCカード', dice: 2, w: 55 },
     { key: 'turbo', name: 'ターボカード', dice: 3, w: 30 },
@@ -51,9 +55,12 @@
     return n.id;
   }
   const roads = [];
+  const linkKind = new Map();
   function link(a, b, kind) {
     adj[a].push(b);
     adj[b].push(a);
+    linkKind.set(a + ',' + b, kind || 'road');
+    linkKind.set(b + ',' + a, kind || 'road');
     links.push({ a, b, kind });
   }
 
@@ -128,6 +135,27 @@
   let G = null;
   const cur = () => G.players[G.turn];
   const yearFactor = () => 1 + 0.25 * (G.year - 1);
+  const fuelPrice = () => Math.round(FUEL_PRICE * yearFactor());
+  // 経路の費用: フェリーは燃料を使わない。ETC使用時は通行料が半額
+  function pathCost(start, path, etc) {
+    let toll = 0, fuel = 0, prev = start;
+    for (const id of path) {
+      const k = linkKind.get(prev + ',' + id) || 'road';
+      toll += TOLL[k] * yearFactor() * (etc ? 0.5 : 1);
+      if (k !== 'sea') fuel++;
+      prev = id;
+    }
+    return { toll: Math.round(toll), fuel };
+  }
+  function refuel(pi, units) {
+    const p = G.players[pi];
+    units = Math.max(0, Math.min(units, FUEL_MAX - p.fuel, Math.floor(p.cash / fuelPrice())));
+    if (units <= 0) return 0;
+    p.fuel += units;
+    p.cash -= units * fuelPrice();
+    log(`⛽ ${esc(p.name)}が給油（${units}目盛・${fmt(units * fuelPrice())}）`, p.color);
+    return units;
+  }
   const delay = (ms = 600) => (G.fast ? ms * 0.25 : ms);
   const stations = () => nodes.filter(n => n.type === 'station');
 
@@ -338,6 +366,7 @@
         <div class="pl-head"><span class="dot"></span><span class="pl-name">${esc(p.name)}</span>${p.cpu ? '<span class="tag">CPU</span>' : ''}<span class="rank">${ranks.indexOf(i) + 1}位</span></div>
         <div class="pl-row"><span>所持金</span><b class="${p.cash < 0 ? 'neg' : ''}">${fmt(p.cash)}</b></div>
         <div class="pl-row"><span>総資産</span><b>${fmt(assets(i))}</b></div>
+        <div class="pl-row fuel ${p.fuel <= 8 ? 'low' : ''}"><span>⛽</span><span class="fbar"><i style="width:${Math.round(p.fuel / FUEL_MAX * 100)}%"></i></span><b>${p.fuel}/${FUEL_MAX}</b></div>
         <div class="pl-row sub"><span>お店${props}軒・年収${fmt(income(i))}</span><span title="カード">🎫${p.cards.length}</span></div>
       </div>`;
     }).join('');
@@ -473,7 +502,7 @@
     return n.type === 'station' ? n.name : SQUARE_LABEL[n.type];
   }
 
-  function askMove(p, cands, steps) {
+  function askMove(p, cands, steps, etc) {
     const dist = distFrom(G.dest);
     const ids = [...cands.keys()];
     if (p.cpu) {
@@ -485,6 +514,8 @@
         if (n.type === 'plus') score -= 3;
         if (n.type === 'card') score -= 4;
         if (n.type === 'station' && n.props.some(pr => pr.owner < 0 && pr.price <= p.cash)) score -= 6;
+        if (n.type === 'station' && p.fuel <= 12) score -= 8;
+        score += pathCost(p.pos, cands.get(id), etc).toll / 40;
         if (id === G.dest) score = -1000;
         if (score < bestScore) { bestScore = score; best = id; }
       });
@@ -512,7 +543,7 @@
       const sorted = ids.slice().sort((a, b) => dist[a] - dist[b]);
       const a = setActions(`<div class="prompt" style="--c:${p.color}">${steps}マス進めます。止まるマスを選んでください</div>
         <div class="cand-list">${sorted.map(id => `<button class="btn cand-btn t-${nodes[id].type}" data-id="${id}">
-          <span>${id === G.dest ? '🚩 ' : ''}${esc(nodeLabel(id))}</span><small>目的地まで${dist[id]}</small></button>`).join('')}</div>`);
+          <span>${id === G.dest ? '🚩 ' : ''}${esc(nodeLabel(id))}</span><small>目的地まで${dist[id]}・通行料${fmt(pathCost(p.pos, cands.get(id), etc).toll)}</small></button>`).join('')}</div>`);
       a.querySelectorAll('[data-id]').forEach(b => {
         const id = +b.dataset.id;
         b.onclick = () => choose(id);
@@ -522,15 +553,25 @@
     });
   }
 
-  async function animateMove(pi, path) {
+  async function animateMove(pi, path, etc) {
     const step = delay(220);
+    const p = G.players[pi];
+    const cost = pathCost(p.pos, path, etc);
     for (const id of path) {
       placeToken(pi, id);
-      G.players[pi].pos = id;
+      p.pos = id;
       cam.tx = nodes[id].x;
       cam.ty = nodes[id].y;
       await sleep(step);
     }
+    p.fuel = Math.max(0, p.fuel - cost.fuel);
+    p.cash -= cost.toll;
+    if (cost.toll || cost.fuel) {
+      log(`🛣 ${esc(p.name)}：通行料 -${fmt(cost.toll)}${etc ? '（ETC割引）' : ''}・ガソリン -${cost.fuel}`, p.color);
+      toast(`🛣 通行料 -${fmt(cost.toll)}${etc ? '（ETC半額）' : ''}　⛽ -${cost.fuel}`, 'toll');
+    }
+    settleDebt(pi);
+    renderAll();
   }
 
   function settleDebt(pi) {
@@ -585,13 +626,20 @@
 
   async function visitStation(pi, n) {
     const p = G.players[pi];
-    if (!n.props.some(pr => pr.owner < 0)) {
+    const hasShop = n.props.some(pr => pr.owner < 0);
+    if (!hasShop && p.fuel >= FUEL_MAX) {
       toast(`${esc(n.label)}のお店はすべて売約済み`);
       await sleep(delay(700));
       return;
     }
     if (p.cpu) {
       const reserve = Math.round(2000 * yearFactor());
+      // ガソリンが減っていたら先に給油 (残金の余裕を見ながら)
+      if (p.fuel <= 20) {
+        const afford = Math.floor(Math.max(0, p.cash - reserve / 2) / fuelPrice());
+        const u = refuel(pi, Math.min(FUEL_MAX - p.fuel, afford));
+        if (u) toast(`⛽ ${esc(p.name)}が${esc(n.label)}で給油`);
+      }
       const order = n.props.map((pr, i) => ({ pr, i })).filter(o => o.pr.owner < 0).sort((a, b) => b.pr.rate - a.pr.rate);
       let bought = 0;
       for (const o of order) {
@@ -604,13 +652,20 @@
     }
     await new Promise(res => {
       const render = () => {
+        const need = FUEL_MAX - p.fuel;
+        const units = Math.min(need, Math.floor(Math.max(0, p.cash) / fuelPrice()));
         const box = openModal(`<h2>${esc(n.name)}に到着</h2>
           <p>所持金: <b class="${p.cash < 0 ? 'neg' : ''}">${fmt(p.cash)}</b></p>
-          ${propTable(n, true)}
-          <div class="modal-actions"><button class="btn primary" id="m-done">買い物を終える</button></div>`);
+          <div class="fuel-box ${p.fuel <= 8 ? 'low' : ''}">
+            <span>⛽ ガソリン</span><span class="fbar"><i style="width:${Math.round(p.fuel / FUEL_MAX * 100)}%"></i></span><b>${p.fuel}/${FUEL_MAX}</b>
+            <button class="btn small" id="m-fuel" ${units > 0 ? '' : 'disabled'}>${need > 0 ? `給油 +${units}（${fmt(units * fuelPrice())}）` : '満タン'}</button>
+          </div>
+          ${hasShop ? propTable(n, true) : '<p class="muted small">このスポットのお店はすべて売約済みです。</p>'}
+          <div class="modal-actions"><button class="btn primary" id="m-done">出発する</button></div>`);
         box.querySelectorAll('[data-buy]').forEach(b => {
           b.onclick = () => { buyProp(pi, n, +b.dataset.buy); renderAll(); render(); };
         });
+        $('#m-fuel', box).onclick = () => { refuel(pi, units); renderAll(); render(); };
         $('#m-done', box).onclick = () => { closeModal(); res(); };
       };
       render();
@@ -657,9 +712,21 @@
     renderAll();
     focusNodes([p.pos, G.dest].filter(x => x != null), 720);
     if (p.cpu) setActions(`<div class="prompt" style="--c:${p.color}">${esc(p.name)}（CPU）が考え中…</div>`);
+    if (p.fuel <= 0) {
+      const fee = Math.round(JAF_FEE * yearFactor() / 100) * 100;
+      p.cash -= fee;
+      p.fuel = 8;
+      toast(`🆘 ガス欠！ JAFを呼んだ<br><b>${esc(p.name)}</b> -${fmt(fee)}（ガソリン8目盛）`, 'minus');
+      log(`🆘 ${esc(p.name)}がガス欠でJAFを呼んだ -${fmt(fee)}`, p.color);
+      settleDebt(pi);
+      renderAll();
+      await sleep(delay(1200));
+    }
     const choice = await askRoll(p);
+    let etc = false;
     if (choice.card >= 0) {
       const c = cardDef(p.cards[choice.card]);
+      etc = c.key === 'etc';
       p.cards.splice(choice.card, 1);
       toast(`🎫 ${esc(p.name)}は${c.name}を使った！`, 'card');
       log(`🎫 ${esc(p.name)}が${c.name}を使用`, p.color);
@@ -668,12 +735,17 @@
     }
     if (p.cpu) setActions(`<div class="prompt" style="--c:${p.color}">${esc(p.name)}（CPU）の番</div>`);
     else setActions(`<div class="prompt" style="--c:${p.color}">サイコロを振っています…</div>`);
-    const steps = await rollDice(choice.dice);
+    const rolled = await rollDice(choice.dice);
+    const steps = Math.min(rolled, p.fuel);
+    if (steps < rolled) {
+      toast(`⛽ ガソリンが少ないので${steps}マスまで進めます`, 'minus');
+      await sleep(delay(900));
+    }
     const cands = reachable(p.pos, steps, G.dest);
     focusNodes([p.pos, ...cands.keys()], 600);
-    const target = await askMove(p, cands, steps);
+    const target = await askMove(p, cands, steps, etc);
     setActions(`<div class="prompt" style="--c:${p.color}">${esc(p.name)}が移動中…</div>`);
-    await animateMove(pi, cands.get(target));
+    await animateMove(pi, cands.get(target), etc);
     await land(pi);
   }
 
@@ -757,6 +829,8 @@
           <li><b>SA・PA・道の駅</b>（<span class="sq-ic sa"></span>四角=SA/PA、<span class="sq-ic mi"></span>丸=道の駅）に止まると、ご当地のお店を買えます。毎年3月の決算で、お店の収益（価格×収益率）が入ります。</li>
           <li>1つのスポットのお店を全部買うと<b>独占</b>！ そのスポットの収益が2倍になります。</li>
           <li><span class="sq-ic plus"></span>青マスはお金がもらえ、<span class="sq-ic minus"></span>赤マスは渋滞や故障でお金を失います（冬は被害大）。<span class="sq-ic card"></span>黄マスではサイコロを増やせるカード（ETC・ターボ・ニトロ）がもらえます。</li>
+          <li><b>⛽ガソリン</b>：1マス進むごとに1目盛減ります（満タン30）。SA・道の駅に止まると給油できます（1目盛15万円）。0になるとJAFを呼んで1,500万円。残りが少ないと進めるマスも減ります。</li>
+          <li><b>🛣通行料</b>：高速道路は1マス8万円、橋は20万円、フェリーは40万円（ガソリンは使いません）。ETCカードを使うターンは半額です。</li>
           <li>北海道・四国・九州へは<b>フェリー</b>（点線）や<b>橋</b>（青い道）で渡ります。</li>
           <li>🚩<b>目的地</b>は全国52か所のSA・道の駅からランダムに決まります。一番乗りすると賞金がもらえます。</li>
           <li>所持金がマイナスになると、安いお店から半額で売却されます。</li>
@@ -775,6 +849,7 @@
           cash: START_CASH,
           pos: spotByLabel['海老名SA'],
           cards: [],
+          fuel: FUEL_MAX,
         });
       });
       closeModal();
